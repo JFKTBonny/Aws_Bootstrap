@@ -1,10 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair
+    Default: aws-bootstrap  # optional default
   EC2InstanceType:
     Type: String
   EC2AMI:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>' # This is a special parameter type that allows our template to get the latest AMI without having to specify the exact version...
-    Default: '/aws/service/ami-amazon-linux-latest/amzn2023-ami-hvm-x86_64-gp2'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-6.1-x86_64'
  
 Resources:
   SecurityGroup:
@@ -61,7 +65,8 @@ Resources:
             yum:
               wget: []
               unzip: []
-    Properties:
+    Properties: 
+      KeyName: !Ref KeyName
       ImageId: !Ref EC2AMI # The AMI ID that we take as a template parameter.
       InstanceType: !Ref EC2InstanceType # The EC2 instance type that we take as a template parameter.
       IamInstanceProfile: !Ref InstanceProfile
