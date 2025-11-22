@@ -98,8 +98,8 @@ Resources:
           su - ec2-user -c "
             git clone https://github.com/JFKTBonny/Aws_Bootstrap.git /home/ec2-user/app &&
             cd /home/ec2-user/app &&
-            chmod +x install.sh &&
-            ./install.sh
+            chmod +x scripts/install.sh &&
+            ./scripts/install.sh
           "
 
           # Signal CFN
