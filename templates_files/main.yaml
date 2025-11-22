@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  EC2InstanceType:
+    Type: String
+  EC2AMI:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>' # This is a special parameter type that allows our template to get the latest AMI without having to specify the exact version...
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+ 
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Internal Security group for ${AWS::StackName}' # !Sub is a CloudFormation function that performs string interpolation...AWS::StackName is a CloudFormation pseudo parameter...
+
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Ref AWS::StackName # !Ref is a CloudFormation function for referring to other resources in your stack...
+
+  InstanceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - "ec2.amazonaws.com"
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName 
+
+  InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Roles:
+        - Ref: InstanceRole 
+
+  Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy: # This tells CloudFormation to wait for a signal before marking the new instance as created...
+      ResourceSignal:
+        Timeout: PT15M
+        Count: 1
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages: # Here we define some prerequisites that CloudFormation will install on our instance (the wget and unzip utilities)
+            yum:
+              wget: []
+              unzip: []
+    Properties:
+      ImageId: !Ref EC2AMI # The AMI ID that we take as a template parameter.
+      InstanceType: !Ref EC2InstanceType # The EC2 instance type that we take as a template parameter.
+      IamInstanceProfile: !Ref InstanceProfile
+      Monitoring: true
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId # !GetAtt is a CloudFormation function that can reference attributes from other resources... 
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          exec > /tmp/userdata.log 2>&1
+
+          dnf -y update
+
+          # Install cfn-bootstrap
+          dnf install -y https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.amzn2023.noarch.rpm
+
+          # Install git
+          dnf install -y git
+
+          # Install NVM
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+
+          # Load NVM
+          export NVM_DIR="/home/ec2-user/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+          # Install Node.js
+          nvm install v12.7.0
+          nvm use v12.7.0
+          nvm alias default v12.7.0
+
+          # Clone your GitHub repo and run install.sh
+          su - ec2-user -c "
+            git clone https://github.com/JFKTBonny/Aws_Bootstrap.git /home/ec2-user/app &&
+            cd /home/ec2-user/app &&
+            chmod +x install.sh &&
+            ./install.sh
+          "
+
+          # Signal CFN
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource Instance               
+
+Outputs:
+  InstanceEndpoint:
+    Description: The DNS name for the created instance
+    Value: !Sub "http://${Instance.PublicDnsName}:8080" # This creates a URL for the endpoint of the instance
+    Export:
+      Name: InstanceEndpoint
