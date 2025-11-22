@@ -1,0 +1,24 @@
+version: 0.0
+os: linux
+
+# Files to copy from the artifact to the instance
+files:
+  - source: "/"                 # root of the build artifact
+    destination: "/home/ec2-user/app/release"
+    permissions:
+      - object: "/home/ec2-user/app/release"
+        pattern: "**"
+        owner: ec2-user
+        group: ec2-user
+
+# Lifecycle hooks to manage the application
+hooks:
+  ApplicationStop:
+    - location: scripts/stop-service.sh
+      timeout: 300
+      runas: ec2-user
+
+  ApplicationStart:
+    - location: scripts/start-service.sh
+      timeout: 300
+      runas: ec2-user

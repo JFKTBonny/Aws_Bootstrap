@@ -54,10 +54,10 @@ Resources:
 
   Instance:
     Type: AWS::EC2::Instance
-    CreationPolicy: # This tells CloudFormation to wait for a signal before marking the new instance as created...
-      ResourceSignal:
-        Timeout: PT15M
-        Count: 1
+    # CreationPolicy: # This tells CloudFormation to wait for a signal before marking the new instance as created...
+    #   ResourceSignal:
+    #     Timeout: PT15M
+    #     Count: 1
     Metadata:
       AWS::CloudFormation::Init:
         config:
@@ -80,35 +80,35 @@ Resources:
 
           dnf -y update
 
-          # Install cfn-bootstrap
-          dnf install -y https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.amzn2023.noarch.rpm
+          # Install CloudFormation bootstrap tools (AL2023)
+          dnf install -y aws-cfn-bootstrap
 
-          # Install git
+          #!/bin/bash -xe
+          exec > /tmp/userdata.log 2>&1
+
+          dnf -y update
           dnf install -y git
 
-          # Install NVM
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
-
-          # Load NVM
-          export NVM_DIR="/home/ec2-user/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-          # Install Node.js
-          nvm install v12.7.0
-          nvm use v12.7.0
-          nvm alias default v12.7.0
-
-          # Clone your GitHub repo and run install.sh
+          # Switch to ec2-user home
           su - ec2-user -c "
-            git clone https://github.com/JFKTBonny/Aws_Bootstrap.git /home/ec2-user/app &&
-            cd /home/ec2-user/app &&
-            chmod +x scripts/install.sh &&
-            ./scripts/install.sh
-          "
+            cd ~
 
-          # Signal CFN
-          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource Instance               
+            # Install NVM correctly
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+            export NVM_DIR=\"/home/ec2-user/.nvm\"
+            source \$NVM_DIR/nvm.sh
+
+            nvm install 18
+            nvm alias default 18
+
+            # Clone your repo
+            git clone https://github.com/JFKTBonny/Aws_Bootstrap.git /home/ec2-user/app
+
+            cd /home/ec2-user/app
+            chmod +x scripts/install.sh
+            ./scripts/install.sh
+          "           
 
 Outputs:
   InstanceEndpoint:

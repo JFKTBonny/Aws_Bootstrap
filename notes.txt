@@ -1,0 +1,13 @@
+#### server.js content:
+     - pm2 is a node process manager,provides dependencies..
+     - npm start to start the app via pm2
+     - pm2 will monitor the under the name hello_aws and send its stdout to ../logs/app.logs
+     - npm stop is used to tell pm2 to stop the app
+
+
+CodePipeline:
+*************
+              CodePipeline requires an s3 bucket to store artifacts built by CodeBuild...[cloudformation can delete s3 only if it is empty...]
+                                               
+AWS CodeBuild, CodePipeline, and CodeDeploy:    """ how they work together to create a CI/CD pipeline """
+*******************************************

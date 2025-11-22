@@ -1,0 +1,38 @@
+How They Work Together in CI/CD
+###############################
+
+Workflow example: Node.js app on EC2
+------------------------------------
+
+Source Stage:
+************
+
+        1- Developer pushes code to GitHub/CodeCommit.
+
+        2- CodePipeline detects the commit.
+
+Build Stage (CodeBuild):
+***********************
+
+        3- Pulls code.
+
+        4- Runs npm install, npm test, npm run build.
+
+        5- Packages artifacts (ZIP or tar) and uploads to S3.
+
+Deploy Stage (CodeDeploy):
+*************************
+
+        6- Downloads artifact from S3.
+
+        7- Deploys to EC2 instances.
+
+        8- Runs hooks (stop previous app, install dependencies, start new version).
+
+Optional Approval Stage:
+***********************
+        9- Manual approval before production
+
+============ Visual Flow:
+                            GitHub/CodeCommit ---→ CodePipeline ---→ CodeBuild(buildspec.yaml) ---→ CodeDeploy(appspec.yaml) ---→ EC2 / Lambda / ECS
+      

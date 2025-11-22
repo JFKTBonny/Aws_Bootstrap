@@ -1,0 +1,17 @@
+Benefits of Using This AWS CI/CD Stack:
+**************************************
+
+        1- Full AWS integration: IAM roles, S3, CloudWatch, CloudTrail.
+           ******************** 
+
+        2- Automatic rollbacks: CodeDeploy can revert failed deployments.
+           *******************
+
+        3- Serverless orchestration: No need to maintain Jenkins/other CI servers.
+           ************************
+
+        4- Scalable: Works with large deployments, multi-AZ EC2 clusters, ECS, or Lambda.
+           ********
+
+        5- Custom hooks: Pre/post deployment scripts for configuration.
+           ************

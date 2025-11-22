@@ -1,13 +1,20 @@
 #!/bin/bash
-set -e  # exit on any error
+set -e  # Exit immediately if any command fails
 
-STACK_NAME="awsbootstrap"
-REGION="us-east-1"
-CLI_PROFILE="default"
-TEMPLATE_FILE="../templates_files/main.yaml"
-EC2_INSTANCE_TYPE="t2.micro"
+# ------------------------------
+# Variables and configuration
+# ------------------------------
+STACK_NAME="awsbootstrap"                         # Name of the CloudFormation stack
+REGION="us-east-1"                               # AWS region to deploy to
+CLI_PROFILE="default"                             # AWS CLI profile to use
+TEMPLATE_FILE="../templates_files/main.yaml"      # Path to the CloudFormation template
+EC2_INSTANCE_TYPE="t2.micro"                     # EC2 instance type
+AWS_ACCOUNT_ID="$(aws sts get-caller-identity --profile "$CLI_PROFILE" --query "Account" --output text)"  # Fetch AWS account ID
+CODEPIPELINE_BUCKET="$STACK_NAME-$REGION-codepipeline-$AWS_ACCOUNT_ID"  # Name for CodePipeline bucket
 
-# Deploy the CloudFormation template
+# ------------------------------
+# Deploy CloudFormation template
+# ------------------------------
 echo -e "\n\n=========== Deploying main.yaml ==========="
 aws cloudformation deploy \
     --region "$REGION" \
@@ -16,9 +23,21 @@ aws cloudformation deploy \
     --template-file "$TEMPLATE_FILE" \
     --no-fail-on-empty-changeset \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides EC2InstanceType="$EC2_INSTANCE_TYPE"
+    --parameter-overrides EC2InstanceType="$EC2_INSTANCE_TYPE" CodePipelineBucket="$CODEPIPELINE_BUCKET"
 
-# If the deploy succeeded, show the DNS name of the created instance
+# ------------------------------
+# Show stack status
+# ------------------------------
+echo -e "\nStack status:"
+aws cloudformation describe-stacks \
+    --stack-name "$STACK_NAME" \
+    --profile "$CLI_PROFILE" \
+    --query "Stacks[0].StackStatus" \
+    --output text
+
+# ------------------------------
+# Fetch and display instance endpoint
+# ------------------------------
 echo -e "\nFetching instance endpoint..."
 aws cloudformation list-exports \
     --profile "$CLI_PROFILE" \

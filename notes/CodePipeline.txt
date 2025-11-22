@@ -1,0 +1,14 @@
+AWS CodePipeline
+****************
+
+    Purpose: Orchestrate the CI/CD workflow.
+
+    Input: Source code or artifacts.
+
+    What it does:
+
+        1- Defines stages (Source → Build → Deploy → Approval).
+
+        2- Automates transitions between stages.
+
+        3- Triggers on code changes (e.g., new commit in GitHub).

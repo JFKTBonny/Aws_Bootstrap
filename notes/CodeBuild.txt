@@ -1,0 +1,49 @@
+ AWS CodeBuild
+**************
+
+Purpose: Build and test your code.
+
+Input: Source code from repositories like GitHub, CodeCommit, or S3.
+
+What it does:
+
+          1- Compiles code (if necessary).
+
+          2- Installs dependencies (npm install, pip install, etc.).
+
+          3- Runs unit tests, linting, or other validation.
+
+          4- Packages artifacts (like .zip or .tar.gz) for deployment.
+
+Output: A build artifact stored in S3 (or CodeBuild’s artifact store) ready for deployment.
+
+Key points:
+
+          1- Fully managed, serverless build service.
+
+          2- Can run Docker images or custom build environments.
+
+          3- Configuration is via buildspec.yaml    
+
+example_yaml_file:(buildspec.yaml content...)
+*****************
+           
+
+        version: 0.2
+
+        phases:
+        install:
+            runtime-versions:
+            nodejs: 18
+            commands:
+            - echo "Installing dependencies"
+            - npm install
+        build:
+            commands:
+            - echo "Building the application"
+            - npm run build
+        artifacts:
+        files:
+            - '**/*'
+        base-directory: 'dist'
+                

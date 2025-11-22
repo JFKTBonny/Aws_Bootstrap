@@ -1,0 +1,45 @@
+AWS CodeDeploy
+**************
+
+Purpose: Deploy your build artifacts to runtime environments.
+
+Deployment targets:
+
+        1- EC2 instances (or Auto Scaling groups)
+
+        2- Lambda functions
+
+        3- ECS containers
+
+Deployment types:
+
+        1- In-place: Updates running instances directly.
+
+        2- Blue/Green: Deploys new version to separate instances and switches traffic when healthy.
+
+Key features:
+
+        1- Tracks deployment status.
+
+        2- Allows hooks for pre- and post-deployment actions (BeforeInstall, AfterInstall, ApplicationStart).
+
+Example appspec.yaml:
+
+    version: 0.0
+    os: linux
+    files:
+    - source: /
+        destination: /home/ec2-user/app
+    hooks:
+    BeforeInstall:
+        - location: scripts/stop_app.sh
+        timeout: 300
+        runas: ec2-user
+    AfterInstall:
+        - location: scripts/install_dependencies.sh
+        timeout: 300
+        runas: ec2-user
+    ApplicationStart:
+        - location: scripts/start_app.sh
+        timeout: 300
+        runas: ec2-user
