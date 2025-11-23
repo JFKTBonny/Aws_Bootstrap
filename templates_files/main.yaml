@@ -163,7 +163,8 @@ Resources:
         Image: aws/codebuild/standard:7.0     # Updated: standard 2.0 is deprecated
         PrivilegedMode: false                 # or true if using Docker builds
       Source:
-        Type: CODEPIPELINE                    # input comes from CodePipeline
+        Type: CODEPIPELINE 
+        BuildSpec: templates_files/buildspec.yaml  # <-- specify path here                   # input comes from CodePipeline
       TimeoutInMinutes: 15
       Cache:
         Type: NO_CACHE                        # optional: S3 cache can be added
