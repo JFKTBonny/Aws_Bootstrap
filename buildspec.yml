@@ -17,14 +17,8 @@ phases:
 
 artifacts:
   files:
-    - server.js
+    - appspec.yml
+    - scripts/**/*
     - package.json
     - package-lock.json
-    
-    - appspec.yml
-    - scripts/start-service.sh
-    - scripts/stop-service.sh
-    - scripts/install.sh
-    - 'node_modules/**/*'
-  discard-paths: yes 
-  base-directory: .
+    - server.js
