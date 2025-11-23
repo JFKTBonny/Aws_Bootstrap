@@ -31,14 +31,13 @@ aws cloudformation deploy \
     --template-file "$TEMPLATE_FILE" \
     --no-fail-on-empty-changeset \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides\
-        EC2InstanceType="$EC2_INSTANCE_TYPE"\ 
-        CodePipelineBucket="$CODEPIPELINE_BUCKET"\
-        GitHubOwner=$GH_OWNER \
-        GitHubRepo=$GH_REPO \
-        GitHubBranch=$GH_BRANCH \
-        GitHubPersonalAccessToken=$GH_ACCESS_TOKEN \
-        CodePipelineBucket=$CODEPIPELINE_BUCKET
+    --parameter-overrides \
+        EC2InstanceType="$EC2_INSTANCE_TYPE" \
+        CodePipelineBucket="$CODEPIPELINE_BUCKET" \
+        GitHubOwner="$GH_OWNER" \
+        GitHubRepo="$GH_REPO" \
+        GitHubBranch="$GH_BRANCH" \
+        GitHubPersonalAccessToken="$GH_ACCESS_TOKEN"
 
 
 # ------------------------------

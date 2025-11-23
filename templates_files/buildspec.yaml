@@ -16,7 +16,8 @@ artifacts:
     - server.js
     - package.json
     - package-lock.json
-    - appspec.yml
+    - templates_files/buildspec.yaml
+    - templates_files/appspec.yaml
     - scripts/start-service.sh
     - scripts/stop-service.sh
     - scripts/install.sh
