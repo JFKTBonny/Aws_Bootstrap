@@ -9,7 +9,24 @@ Parameters:
   EC2AMI:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>' # This is a special parameter type that allows our template to get the latest AMI without having to specify the exact version...
     Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-6.1-x86_64'
- 
+  CodePipelineBucket:
+    Type: String
+    Description: 'The S3 bucket for CodePipeline artifacts.'
+  GitHubOwner:
+    Type: String
+    Description: 'The username of the source GitHub repo.'
+  GitHubRepo:
+    Type: String
+    Description: 'The source GitHub repo name (without the username).'
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: 'The source GitHub branch.'
+  GitHubPersonalAccessToken:
+    Type: String
+    NoEcho: true
+    Description: 'A GitHub personal access token with "repo" and "admin:repo_hook" permissions.'  
+  
 Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -42,9 +59,27 @@ Resources:
           Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/CloudWatchFullAccess
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy # Allows our EC2 instance to access CodeDeploy.
+
       Tags:
         - Key: Name
           Value: !Ref AWS::StackName 
+
+  DeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - codepipeline.amazonaws.com
+              - codedeploy.amazonaws.com
+              - codebuild.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess # allow codebuild,codedeploy and codepipeline to access aws resources       
 
   InstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -58,14 +93,15 @@ Resources:
     #   ResourceSignal:
     #     Timeout: PT15M
     #     Count: 1
-    Metadata:
-      AWS::CloudFormation::Init:
-        config:
-          packages: # Here we define some prerequisites that CloudFormation will install on our instance (the wget and unzip utilities)
-            yum:
-              wget: []
-              unzip: []
-    Properties: 
+    # Metadata:
+      # AWS::CloudFormation::Init:
+      #   config:
+      #     packages: # Here we define some prerequisites that CloudFormation will install on our instance (the wget and unzip utilities)
+      #       yum:
+      #         wget: []
+      #         unzip: []
+      #         ruby: []
+    Properties:
       KeyName: !Ref KeyName
       ImageId: !Ref EC2AMI # The AMI ID that we take as a template parameter.
       InstanceType: !Ref EC2InstanceType # The EC2 instance type that we take as a template parameter.
@@ -76,39 +112,142 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          exec > /tmp/userdata.log 2>&1
 
-          dnf -y update
+          # Update system
+          dnf update -y
 
-          # Install CloudFormation bootstrap tools (AL2023)
-          dnf install -y aws-cfn-bootstrap
+          # Install Node and PM2
+          dnf install -y nodejs npm
+          npm install -g pm2
 
-          #!/bin/bash -xe
-          exec > /tmp/userdata.log 2>&1
+          # Install CodeDeploy agent (Amazon Linux 2023)
+          dnf install -y ruby wget
+          cd /tmp
+          wget https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install
+          chmod +x install
+          ./install auto
+          systemctl enable codedeploy-agent
+          systemctl start codedeploy-agent
 
-          dnf -y update
-          dnf install -y git
+          # Prepare an application directory for CodeDeploy
+          mkdir -p /home/ec2-user/app/release
+          chown -R ec2-user:ec2-user /home/ec2-user/app  
 
-          # Switch to ec2-user home
-          su - ec2-user -c "
-            cd ~
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-CodeBuild"
+      ServiceRole: !GetAtt DeploymentRole.Arn   # must allow codebuild actions
+      Artifacts:
+        Type: CODEPIPELINE                    # output goes to CodePipeline
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0     # Updated: standard 2.0 is deprecated
+        PrivilegedMode: false                 # or true if using Docker builds
+      Source:
+        Type: CODEPIPELINE                    # input comes from CodePipeline
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE                        # optional: S3 cache can be added
+      Description: Build project for CI/CD pipeline
 
-            # Install NVM correctly
-            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  DeploymentApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Ref AWS::StackName
+      ComputePlatform: Server   
 
-            export NVM_DIR=\"/home/ec2-user/.nvm\"
-            source \$NVM_DIR/nvm.sh
+  StagingDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    DependsOn: Instance
+    Properties:
+      DeploymentGroupName: staging
+      ApplicationName: !Ref DeploymentApplication
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce   #  Deploy strategy
+      ServiceRoleArn: !GetAtt DeploymentRole.Arn
+      Ec2TagFilters:                                       # EC2 selection via tags
+        - Key: aws:cloudformation:stack-name
+          Type: KEY_AND_VALUE
+          Value: !Ref AWS::StackName  
 
-            nvm install 18
-            nvm alias default 18
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Ref AWS::StackName
+      RoleArn: !GetAtt DeploymentRole.Arn
 
-            # Clone your repo
-            git clone https://github.com/JFKTBonny/Aws_Bootstrap.git /home/ec2-user/app
+      ArtifactStore:
+        Type: S3
+        Location: !Ref CodePipelineBucket
 
-            cd /home/ec2-user/app
-            chmod +x scripts/install.sh
-            ./scripts/install.sh
-          "           
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: 1
+              OutputArtifacts:
+                - Name: Source
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubPersonalAccessToken
+                PollForSourceChanges: false   # ❶ Using webhooks instead of polling
+              RunOrder: 1
+
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              InputArtifacts:
+                - Name: Source
+              OutputArtifacts:
+                - Name: Build
+              Configuration:
+                ProjectName: !Ref BuildProject
+              RunOrder: 1
+
+        - Name: Staging
+          Actions:
+            - Name: Staging
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              InputArtifacts:
+                - Name: Build
+              Configuration:
+                ApplicationName: !Ref DeploymentApplication
+                DeploymentGroupName: !Ref StagingDeploymentGroup
+              RunOrder: 1  
+
+  PipelineWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Name: !Sub "webhook-${AWS::StackName}"
+      TargetPipeline: !Ref Pipeline
+      TargetPipelineVersion: !GetAtt Pipeline.Version
+      TargetAction: Source
+
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubPersonalAccessToken
+
+      RegisterWithThirdParty: true
+
+      Filters:
+        - JsonPath: $.ref
+          MatchEquals: "refs/heads/{Branch}"                     
 
 Outputs:
   InstanceEndpoint:
