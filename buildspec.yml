@@ -21,7 +21,7 @@ artifacts:
     - package.json
     - package-lock.json
     
-    - templates_files/appspec.yaml
+    - appspec.yml
     - scripts/start-service.sh
     - scripts/stop-service.sh
     - scripts/install.sh
