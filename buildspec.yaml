@@ -27,4 +27,4 @@ artifacts:
     - scripts/install.sh
     - 'node_modules/**/*'
   discard-paths: yes 
-  base-directory: Aws_Bootstrap 
+  base-directory: .

@@ -182,7 +182,7 @@ Resources:
     Properties:
       DeploymentGroupName: staging
       ApplicationName: !Ref DeploymentApplication
-      DeploymentConfigName: CodeDeployDefault.AllAtOnce   #  Deploy strategy
+      DeploymentConfigName: CodeDeployDefault.OneAtATime   #  Deploy strategy
       ServiceRoleArn: !GetAtt DeploymentRole.Arn
       Ec2TagFilters:                                       # EC2 selection via tags
         - Key: aws:cloudformation:stack-name
